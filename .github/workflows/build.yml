@@ -1,0 +1,79 @@
+name: Build PDF Reader APK
+
+on:
+workflow_dispatch:
+push:
+paths:
+- 'PdfReader-fixed.zip'
+- '.github/workflows/build.yml'
+
+permissions:
+contents: read
+
+jobs:
+build:
+name: Build Android APK
+runs-on: ubuntu-latest
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Set up Java 17
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
+
+  - name: Set up Android SDK
+    uses: android-actions/setup-android@v3
+
+  - name: Install Android SDK components
+    run: |
+      sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+  - name: Extract uploaded ZIP
+    id: locate
+    run: |
+      set -e
+
+      ZIP_FILE="PdfReader-fixed.zip"
+
+      if [ ! -f "$ZIP_FILE" ]; then
+        echo "ERROR: $ZIP_FILE not found in repository root."
+        exit 1
+      fi
+
+      mkdir -p extracted
+      unzip -q "$ZIP_FILE" -d extracted
+
+      SETTINGS_FILE=$(find "$GITHUB_WORKSPACE/extracted" \
+        -type f -name "settings.gradle.kts" -print -quit)
+
+      if [ -z "$SETTINGS_FILE" ]; then
+        echo "ERROR: settings.gradle.kts not found in ZIP."
+        exit 1
+      fi
+
+      PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+      echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      echo "Android project found at: $PROJECT_DIR"
+
+  - name: Grant Gradle permission
+    working-directory: ${{ steps.locate.outputs.project_dir }}
+    run: chmod +x gradlew
+
+  - name: Build Debug APK
+    working-directory: ${{ steps.locate.outputs.project_dir }}
+    run: |
+      ./gradlew --no-daemon clean assembleDebug
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: PdfReader-debug-APK
+      path: ${{ steps.locate.outputs.project_dir }}/app/build/outputs/apk/debug/*.apk
+      if-no-files-found: error
+      retention-days: 30
