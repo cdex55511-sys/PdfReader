@@ -5,7 +5,7 @@ name: Build PDF Reader APK
   workflow_dispatch:
   push:
     paths:
-      - 'PdfReader-fixed-v2.zip'
+      - 'PdfReader-fixed-v3.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
           set -e
 
           mkdir -p extracted
-          unzip -q PdfReader-fixed-v2.zip -d extracted
+          unzip -q PdfReader-fixed-v3.zip -d extracted
 
           SETTINGS_FILE=$(find "$PWD/extracted" -type f -name settings.gradle.kts -print -quit)
 
