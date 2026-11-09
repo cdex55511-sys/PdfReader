@@ -37,8 +37,13 @@ jobs:
 
       - name: Verify ZIP file
         run: |
+          echo "Checking repository files..."
           ls -lah
-          test -f PdfReader-fixed-v2.zip
+          if [ ! -f "./PdfReader-fixed-v3.zip" ]; then
+            echo "ERROR: PdfReader-fixed-v3.zip not found"
+            exit 1
+          fi
+          echo "ZIP file found successfully!"
 
       - name: Extract ZIP
         id: extract
@@ -46,12 +51,12 @@ jobs:
           set -e
 
           mkdir -p extracted
-          unzip -q PdfReader-fixed-v3.zip -d extracted
+          unzip -q ./PdfReader-fixed-v3.zip -d extracted
 
           SETTINGS_FILE=$(find "$PWD/extracted" -type f -name settings.gradle.kts -print -quit)
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle.kts not found"
+            echo "ERROR: Gradle project not found"
             exit 1
           fi
 
@@ -75,36 +80,33 @@ jobs:
             echo 'networkTimeout=120000' >> "$FILE"
           fi
 
-          cat "$FILE"
-
       - name: Cache Gradle files
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/wrapper/dists
             ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('PdfReader-fixed-v2.zip') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('PdfReader-fixed-v3.zip') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Download Gradle distribution with retries
+      - name: Download Gradle with retries
         working-directory: ${{ steps.extract.outputs.project_dir }}
         run: |
           chmod +x gradlew
 
           for attempt in 1 2 3; do
-            echo "Gradle download attempt $attempt of 3"
+            echo "Attempt $attempt of 3"
 
             if ./gradlew --version; then
-              echo "Gradle distribution ready"
               exit 0
             fi
 
-            echo "Download failed. Retrying in 15 seconds..."
+            echo "Retrying in 15 seconds..."
             sleep 15
           done
 
-          echo "ERROR: Gradle download failed after 3 attempts"
+          echo "Gradle download failed"
           exit 1
 
       - name: Build Debug APK
