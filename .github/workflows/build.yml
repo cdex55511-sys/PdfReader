@@ -5,7 +5,7 @@ name: Build PDF Reader APK
   workflow_dispatch:
   push:
     paths:
-      - 'PdfReader-fixed.zip'
+      - 'PdfReader-fixed-v2.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -35,18 +35,23 @@ jobs:
         run: |
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Verify ZIP file
+        run: |
+          ls -lah
+          test -f PdfReader-fixed-v2.zip
+
       - name: Extract ZIP
         id: extract
         run: |
           set -e
 
           mkdir -p extracted
-          unzip -q PdfReader-fixed.zip -d extracted
+          unzip -q PdfReader-fixed-v2.zip -d extracted
 
           SETTINGS_FILE=$(find "$PWD/extracted" -type f -name settings.gradle.kts -print -quit)
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: Gradle project not found"
+            echo "ERROR: settings.gradle.kts not found"
             exit 1
           fi
 
@@ -58,6 +63,8 @@ jobs:
           fi
 
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Build Debug APK
         working-directory: ${{ steps.extract.outputs.project_dir }}
