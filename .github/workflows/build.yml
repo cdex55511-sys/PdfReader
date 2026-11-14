@@ -1,11 +1,11 @@
 
 name: Build PDF Reader APK
 
-'on':
+on:
   workflow_dispatch:
   push:
     paths:
-      - 'PdfReader-fixed-v3.zip'
+      - 'PdfReader.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -26,98 +25,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Install Android SDK components
+      - name: Extract Android project
         run: |
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          unzip -q PdfReader.zip -d .
+          ls -la
+          test -f PdfReader/gradlew
 
-      - name: Verify ZIP file
-        run: |
-          echo "Checking repository files..."
-          ls -lah
-          if [ ! -f "./PdfReader-fixed-v3.zip" ]; then
-            echo "ERROR: PdfReader-fixed-v3.zip not found"
-            exit 1
-          fi
-          echo "ZIP file found successfully!"
-
-      - name: Extract ZIP
-        id: extract
-        run: |
-          set -e
-
-          mkdir -p extracted
-          unzip -q ./PdfReader-fixed-v3.zip -d extracted
-
-          SETTINGS_FILE=$(find "$PWD/extracted" -type f -name settings.gradle.kts -print -quit)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: Gradle project not found"
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
-          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
-            echo "ERROR: gradlew not found"
-            exit 1
-          fi
-
-          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Increase Gradle network timeout
-        working-directory: ${{ steps.extract.outputs.project_dir }}
-        run: |
-          FILE="gradle/wrapper/gradle-wrapper.properties"
-
-          if grep -q '^networkTimeout=' "$FILE"; then
-            sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$FILE"
-          else
-            echo 'networkTimeout=120000' >> "$FILE"
-          fi
-
-      - name: Cache Gradle files
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/wrapper/dists
-            ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('PdfReader-fixed-v3.zip') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Download Gradle with retries
-        working-directory: ${{ steps.extract.outputs.project_dir }}
-        run: |
-          chmod +x gradlew
-
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt of 3"
-
-            if ./gradlew --version; then
-              exit 0
-            fi
-
-            echo "Retrying in 15 seconds..."
-            sleep 15
-          done
-
-          echo "Gradle download failed"
-          exit 1
+      - name: Grant Gradle permission
+        run: chmod +x PdfReader/gradlew
 
       - name: Build Debug APK
-        working-directory: ${{ steps.extract.outputs.project_dir }}
-        run: |
-          ./gradlew --no-daemon clean assembleDebug
+        working-directory: PdfReader
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PdfReader-debug-APK
-          path: ${{ steps.extract.outputs.project_dir }}/app/build/outputs/apk/debug/*.apk
+          name: PdfReader-APK
+          path: PdfReader/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 30
